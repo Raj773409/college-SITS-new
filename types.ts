@@ -64,7 +64,37 @@ export interface Submission {
   fileName?: string;
   grade?: string;
   feedback?: string;
-  status: 'pending' | 'graded';
+  status: 'pending' | 'graded' | 'late';
+}
+
+// New Types for Faculty Resources
+export type ResourceType = 'note' | 'video' | 'assignment' | 'event' | 'project' | 'image';
+
+export interface CourseResource {
+  id: string;
+  title: string;
+  description: string;
+  type: ResourceType;
+  url?: string; // Or base64 content
+  datePosted: string;
+  postedBy: string;
+}
+
+// New Types for Attendance
+export interface AttendanceRecord {
+  date: string;
+  rollNo: string;
+  status: 'present' | 'absent' | 'late';
+}
+
+// New Types for Chat
+export interface ChatMessage {
+  id: string;
+  senderRoll: string;
+  senderName: string;
+  text: string;
+  timestamp: string;
+  groupName: string; // 'General', 'CSE-A', etc.
 }
 
 export enum AppRoute {

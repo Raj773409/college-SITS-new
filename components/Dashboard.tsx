@@ -1,12 +1,12 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { UserProfile, Submission, SkillRoadmap, ResumeData } from '../types';
+import { UserProfile, Submission, SkillRoadmap, ResumeData, ChatMessage, CourseResource, AttendanceRecord } from '../types';
 import { 
   Bell, Search, Menu, BookOpen, Calendar, Award, LogOut, Settings, X, Send,
   Sparkles, Sun, Moon, Upload, ClipboardList, Plus, FileText, Trash2,
   CheckCircle, AlertCircle, Bold, Italic, List, Download, Briefcase, Target,
   CheckSquare, RefreshCw, Printer, HelpCircle, ChevronRight, User as UserIcon, Camera,
-  GraduationCap, Clock
+  GraduationCap, Clock, MessageCircle, Bot, Video, Image as ImageIcon, Users
 } from 'lucide-react';
 import { generateAIResponse, generateJSON } from '../services/geminiService';
 
@@ -20,23 +20,37 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
   const [view, setView] = useState<'home' | 'profile'>('home');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
+  
+  // AI Chat State
+  const [showAiChat, setShowAiChat] = useState(false);
   const [chatInput, setChatInput] = useState("");
   const [chatMessages, setChatMessages] = useState<{role: 'user' | 'ai', text: string}[]>([
     { role: 'ai', text: `Hi ${user.name.split(' ')[0]}! I'm your SITS AI Tutor. How can I help you with your CSE studies today?` }
   ]);
   const [isAiLoading, setIsAiLoading] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
   
   // Theme State
   const [isDark, setIsDark] = useState(() => localStorage.getItem('theme') === 'dark');
 
   // Modal States
   const [showCoursesModal, setShowCoursesModal] = useState(false);
-  const [courseTab, setCourseTab] = useState<'enrolled' | 'catalog' | 'grades'>('enrolled');
+  const [courseTab, setCourseTab] = useState<'enrolled' | 'catalog' | 'grades' | 'resources'>('enrolled');
   const [showAssignmentsModal, setShowAssignmentsModal] = useState(false);
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [showResumeModal, setShowResumeModal] = useState(false);
   const [showSkillModal, setShowSkillModal] = useState(false);
+  const [showCommunityModal, setShowCommunityModal] = useState(false);
   
+  // Community Chat State
+  const [groupMessages, setGroupMessages] = useState<ChatMessage[]>([]);
+  const [groupInput, setGroupInput] = useState("");
+
+  // Data States
+  const [gradedSubmissions, setGradedSubmissions] = useState<Submission[]>([]);
+  const [resources, setResources] = useState<CourseResource[]>([]);
+  const [attendanceStats, setAttendanceStats] = useState<{present: number, absent: number, percentage: number}>({present: 0, absent: 0, percentage: 100});
+
   // Profile Edit State
   const [profileForm, setProfileForm] = useState(user);
   const profilePicInputRef = useRef<HTMLInputElement>(null);
@@ -56,7 +70,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
   const [skillInterest, setSkillInterest] = useState("");
   const [roadmap, setRoadmap] = useState<SkillRoadmap | undefined>(user.activeRoadmap);
   const [isGeneratingRoadmap, setIsGeneratingRoadmap] = useState(false);
-  const [gradedSubmissions, setGradedSubmissions] = useState<Submission[]>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -91,12 +104,41 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
   }, [isDark]);
 
   useEffect(() => {
+    // Load Graded Submissions
     const storedSubmissions = localStorage.getItem('sits_submissions');
     if (storedSubmissions) {
         const all: Submission[] = JSON.parse(storedSubmissions);
-        setGradedSubmissions(all.filter(s => s.studentRoll === user.rollNo && s.status === 'graded'));
+        setGradedSubmissions(all.filter(s => s.studentRoll === user.rollNo && (s.status === 'graded' || s.status === 'late')));
     }
-  }, [showCoursesModal, user.rollNo]);
+
+    // Load Resources
+    const storedResources = localStorage.getItem('sits_resources');
+    if (storedResources) {
+      setResources(JSON.parse(storedResources));
+    }
+
+    // Load Attendance
+    const storedAttendance = localStorage.getItem('sits_attendance');
+    if (storedAttendance) {
+      const records: AttendanceRecord[] = JSON.parse(storedAttendance);
+      const myRecords = records.filter(r => r.rollNo === user.rollNo);
+      const present = myRecords.filter(r => r.status === 'present').length;
+      const absent = myRecords.filter(r => r.status === 'absent').length;
+      const total = present + absent;
+      const percentage = total === 0 ? 100 : Math.round((present / total) * 100);
+      setAttendanceStats({ present, absent, percentage });
+    }
+
+    // Load Chat Messages
+    const storedChat = localStorage.getItem('sits_group_chat');
+    if (storedChat) {
+      setGroupMessages(JSON.parse(storedChat));
+    }
+  }, [showCoursesModal, user.rollNo, showCommunityModal]);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages]);
 
   const toggleTheme = () => setIsDark(!isDark);
 
@@ -113,6 +155,25 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
     
     setChatMessages(prev => [...prev, { role: 'ai', text: response }]);
     setIsAiLoading(false);
+  };
+
+  const handleGroupChatSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!groupInput.trim()) return;
+
+    const newMessage: ChatMessage = {
+      id: Date.now().toString(),
+      senderRoll: user.rollNo,
+      senderName: user.name,
+      text: groupInput,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      groupName: 'SITS Community'
+    };
+
+    const updatedMessages = [...groupMessages, newMessage];
+    setGroupMessages(updatedMessages);
+    localStorage.setItem('sits_group_chat', JSON.stringify(updatedMessages));
+    setGroupInput("");
   };
 
   const handleProfileUpdate = (e: React.FormEvent) => {
@@ -453,57 +514,115 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
 
       {/* Main Content Area */}
       {view === 'home' && (
-      <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full animate-fade-in">
-        <div className="mb-8">
-            <h1 className="text-3xl font-bold text-slate-800 dark:text-white mb-2">Hello, {user.name.split(' ')[0]} 👋</h1>
-            <p className="text-slate-500 dark:text-slate-400">Here's what's happening in your department today.</p>
-        </div>
-
-        {/* Quick Stats/Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <FeatureCard 
-                icon={BookOpen} 
-                title="My Courses" 
-                desc={`${user.enrolledCourses?.length || 0} Active Subjects`} 
-                color="bg-blue-500" 
-                onClick={() => setShowCoursesModal(true)}
-            />
-            <FeatureCard 
-                icon={ClipboardList} 
-                title="Assignments" 
-                desc="Submit Work" 
-                color="bg-orange-500" 
-                onClick={() => setShowAssignmentsModal(true)}
-            />
-            <FeatureCard icon={Calendar} title="Attendance" desc="85% Present" color="bg-emerald-500" />
-            <div 
-              onClick={handleDownloadResult}
-              className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 hover:shadow-md transition-all cursor-pointer group hover:-translate-y-1"
-            >
-              <div className="w-12 h-12 rounded-lg bg-amber-500 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                <Award className="w-6 h-6 text-white" />
-              </div>
-              <h3 className="font-bold text-slate-800 dark:text-white mb-1">Results</h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400">CGPA: 8.5 <span className="text-xs text-sits-600 dark:text-sits-400 ml-1">(Download)</span></p>
+      <main className="flex-1 w-full animate-fade-in pb-10">
+        
+        {/* Hero Section */}
+        <div className="relative bg-gradient-to-r from-sits-600 to-indigo-700 dark:from-slate-800 dark:to-sits-900 text-white overflow-hidden mb-8">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-10 translate-x-10 blur-3xl"></div>
+            <div className="absolute bottom-0 left-0 w-48 h-48 bg-purple-500/20 rounded-full translate-y-10 -translate-x-10 blur-3xl"></div>
+            
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16 relative z-10 flex flex-col md:flex-row items-center justify-between">
+                <div className="mb-6 md:mb-0 text-center md:text-left animate-slide-up">
+                    <h1 className="text-4xl md:text-5xl font-bold mb-4 tracking-tight">
+                        Welcome back, {user.name.split(' ')[0]}!
+                    </h1>
+                    <p className="text-sits-100 text-lg md:text-xl max-w-xl leading-relaxed">
+                        Track your academic progress, access study materials, and build your skills with AI-powered tools.
+                    </p>
+                    <div className="mt-8 flex flex-wrap gap-4 justify-center md:justify-start">
+                        <button 
+                            onClick={() => setShowCoursesModal(true)}
+                            className="bg-white text-sits-700 hover:bg-sits-50 px-6 py-3 rounded-full font-bold shadow-lg transition-transform hover:scale-105 flex items-center"
+                        >
+                            <BookOpen className="w-5 h-5 mr-2" /> My Courses
+                        </button>
+                         <button 
+                            onClick={() => setShowSkillModal(true)}
+                            className="bg-sits-500/30 hover:bg-sits-500/50 text-white border border-white/20 px-6 py-3 rounded-full font-bold backdrop-blur-sm transition-all hover:scale-105 flex items-center"
+                        >
+                            <Sparkles className="w-5 h-5 mr-2" /> AI Tutor
+                        </button>
+                    </div>
+                </div>
+                <div className="hidden md:block relative animate-scale-up" style={{ animationDelay: '0.2s' }}>
+                     <div className="w-64 h-64 bg-white/10 rounded-2xl rotate-3 backdrop-blur-md border border-white/20 flex items-center justify-center relative z-10">
+                        <div className="text-center p-6">
+                            <div className="w-16 h-16 bg-green-400 rounded-full mx-auto mb-4 flex items-center justify-center shadow-lg">
+                                <Award className="w-8 h-8 text-white" />
+                            </div>
+                            <h3 className="font-bold text-2xl mb-1">8.75</h3>
+                            <p className="text-sm text-sits-100">Current CGPA</p>
+                            <div className="mt-4 w-full bg-white/20 h-2 rounded-full overflow-hidden">
+                                <div className="bg-green-400 h-full w-4/5"></div>
+                            </div>
+                            <p className="text-xs text-sits-200 mt-2">Top 5% of class</p>
+                        </div>
+                     </div>
+                     <div className="absolute inset-0 bg-indigo-600/30 rounded-2xl -rotate-3 -z-10"></div>
+                </div>
             </div>
         </div>
 
-        {/* New Feature Row */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            <FeatureCard 
-                icon={Briefcase} 
-                title="Resume Builder" 
-                desc="Auto-generate CV" 
-                color="bg-slate-600" 
-                onClick={() => setShowResumeModal(true)}
-            />
-            <FeatureCard 
-                icon={Target} 
-                title="Skill Boost" 
-                desc="AI Learning Path" 
-                color="bg-purple-600" 
-                onClick={() => setShowSkillModal(true)}
-            />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            {/* Quick Stats/Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 -mt-10 relative z-20">
+                <FeatureCard 
+                    icon={BookOpen} 
+                    title="My Courses" 
+                    desc={`${user.enrolledCourses?.length || 0} Active Subjects`} 
+                    color="bg-blue-500" 
+                    onClick={() => setShowCoursesModal(true)}
+                />
+                <FeatureCard 
+                    icon={ClipboardList} 
+                    title="Assignments" 
+                    desc="Submit Work" 
+                    color="bg-orange-500" 
+                    onClick={() => setShowAssignmentsModal(true)}
+                />
+                <FeatureCard 
+                    icon={Calendar} 
+                    title="Attendance" 
+                    desc={`${attendanceStats.percentage}% Present`} 
+                    color="bg-emerald-500" 
+                />
+                <div 
+                  onClick={handleDownloadResult}
+                  className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 hover:shadow-md transition-all cursor-pointer group hover:-translate-y-1"
+                >
+                  <div className="w-12 h-12 rounded-lg bg-amber-500 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                    <Award className="w-6 h-6 text-white" />
+                  </div>
+                  <h3 className="font-bold text-slate-800 dark:text-white mb-1">Results</h3>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">CGPA: 8.5 <span className="text-xs text-sits-600 dark:text-sits-400 ml-1">(Download)</span></p>
+                </div>
+            </div>
+
+            {/* New Feature Row */}
+            <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-4 flex items-center"><Sparkles className="w-5 h-5 mr-2 text-purple-500" /> Discover More</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <FeatureCard 
+                    icon={Briefcase} 
+                    title="Resume Builder" 
+                    desc="Auto-generate CV" 
+                    color="bg-slate-600" 
+                    onClick={() => setShowResumeModal(true)}
+                />
+                <FeatureCard 
+                    icon={Target} 
+                    title="Skill Boost" 
+                    desc="AI Learning Path" 
+                    color="bg-purple-600" 
+                    onClick={() => setShowSkillModal(true)}
+                />
+                <FeatureCard 
+                    icon={MessageCircle} 
+                    title="Community" 
+                    desc="Chat & Groups" 
+                    color="bg-indigo-600" 
+                    onClick={() => setShowCommunityModal(true)}
+                />
+            </div>
         </div>
       </main>
       )}
@@ -576,7 +695,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
                         </div>
                     </div>
                     
-                    <div className="flex justify-end pt-4">
+                    <div className="flex justify-between pt-4">
+                         <button 
+                            type="button" 
+                            onClick={onLogout}
+                            className="bg-red-50 text-red-600 dark:bg-red-900/20 px-6 py-3 rounded-lg font-bold hover:bg-red-100 dark:hover:bg-red-900/30 flex items-center transition-colors"
+                        >
+                            <LogOut className="w-5 h-5 mr-2" /> Logout
+                        </button>
+
                         <button type="submit" className="bg-sits-600 hover:bg-sits-700 text-white px-8 py-3 rounded-lg font-bold shadow-lg transition-all hover:scale-105">
                             Save Changes
                         </button>
@@ -585,6 +712,49 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
             </div>
         </div>
       )}
+
+      {/* AI Chat Widget */}
+      <div className="fixed bottom-6 right-6 z-50">
+        {!showAiChat ? (
+          <button 
+            onClick={() => setShowAiChat(true)}
+            className="w-14 h-14 bg-sits-600 hover:bg-sits-700 text-white rounded-full shadow-2xl flex items-center justify-center transition-all hover:scale-110"
+          >
+            <Bot className="w-8 h-8" />
+          </button>
+        ) : (
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-80 sm:w-96 flex flex-col h-[500px] border border-slate-200 dark:border-slate-700 animate-slide-up overflow-hidden">
+            <div className="bg-sits-600 p-4 text-white flex justify-between items-center">
+              <div className="flex items-center">
+                <Bot className="w-6 h-6 mr-2" />
+                <h3 className="font-bold">SITS AI Tutor</h3>
+              </div>
+              <button onClick={() => setShowAiChat(false)} className="hover:bg-white/20 p-1 rounded-full"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50 dark:bg-slate-900">
+               {chatMessages.map((msg, idx) => (
+                 <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                   <div className={`max-w-[80%] p-3 rounded-2xl text-sm ${msg.role === 'user' ? 'bg-sits-600 text-white rounded-tr-none' : 'bg-white dark:bg-slate-700 text-slate-800 dark:text-white rounded-tl-none shadow-sm'}`}>
+                     {msg.text}
+                   </div>
+                 </div>
+               ))}
+               {isAiLoading && <div className="text-slate-400 text-xs text-center">AI is typing...</div>}
+               <div ref={chatEndRef} />
+            </div>
+            <form onSubmit={handleAiSubmit} className="p-3 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex">
+               <input 
+                 type="text" 
+                 value={chatInput} 
+                 onChange={(e) => setChatInput(e.target.value)}
+                 className="flex-1 bg-slate-100 dark:bg-slate-700 dark:text-white rounded-full px-4 py-2 outline-none focus:ring-1 focus:ring-sits-500" 
+                 placeholder="Ask about your course..."
+               />
+               <button type="submit" className="ml-2 p-2 bg-sits-600 text-white rounded-full hover:bg-sits-700"><Send className="w-4 h-4" /></button>
+            </form>
+          </div>
+        )}
+      </div>
 
       {/* Courses Modal */}
       {showCoursesModal && (
@@ -595,25 +765,16 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
                     <button onClick={() => setShowCoursesModal(false)} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors"><X className="w-6 h-6 dark:text-slate-400" /></button>
                 </div>
                 
-                <div className="flex border-b border-slate-200 dark:border-slate-700">
-                    <button 
-                        onClick={() => setCourseTab('enrolled')}
-                        className={`flex-1 py-4 font-semibold text-center transition-colors ${courseTab === 'enrolled' ? 'border-b-2 border-sits-600 text-sits-600 bg-sits-50 dark:bg-slate-800 dark:text-sits-400' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
-                    >
-                        My Courses
-                    </button>
-                    <button 
-                         onClick={() => setCourseTab('catalog')}
-                        className={`flex-1 py-4 font-semibold text-center transition-colors ${courseTab === 'catalog' ? 'border-b-2 border-sits-600 text-sits-600 bg-sits-50 dark:bg-slate-800 dark:text-sits-400' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
-                    >
-                        Course Catalog
-                    </button>
-                    <button 
-                         onClick={() => setCourseTab('grades')}
-                        className={`flex-1 py-4 font-semibold text-center transition-colors ${courseTab === 'grades' ? 'border-b-2 border-sits-600 text-sits-600 bg-sits-50 dark:bg-slate-800 dark:text-sits-400' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
-                    >
-                        Grades & Feedback
-                    </button>
+                <div className="flex border-b border-slate-200 dark:border-slate-700 overflow-x-auto">
+                    {['enrolled', 'catalog', 'grades', 'resources'].map((tab) => (
+                         <button 
+                            key={tab}
+                            onClick={() => setCourseTab(tab as any)}
+                            className={`flex-1 min-w-[120px] py-4 font-semibold text-center transition-colors capitalize ${courseTab === tab ? 'border-b-2 border-sits-600 text-sits-600 bg-sits-50 dark:bg-slate-800 dark:text-sits-400' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
+                        >
+                            {tab === 'resources' ? 'Classroom' : tab.replace('_', ' ')}
+                        </button>
+                    ))}
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-6 bg-slate-50 dark:bg-slate-800/50">
@@ -673,13 +834,17 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
                                 <div key={sub.id} className="bg-white dark:bg-slate-700 p-5 rounded-xl shadow-sm border-l-4 border-green-500">
                                     <div className="flex justify-between">
                                         <h3 className="font-bold text-lg dark:text-white">{sub.assignmentTitle}</h3>
-                                        <span className="text-green-600 dark:text-green-400 font-bold text-xl">{sub.grade}</span>
+                                        <span className={`font-bold text-xl ${sub.status === 'late' ? 'text-red-500' : 'text-green-600 dark:text-green-400'}`}>
+                                            {sub.status === 'late' ? 'Late' : sub.grade}
+                                        </span>
                                     </div>
                                     <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">Submitted: {sub.submittedDate}</p>
-                                    <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg">
-                                        <p className="text-xs font-bold text-slate-500 uppercase mb-1">Feedback</p>
-                                        <p className="text-sm text-slate-700 dark:text-slate-300 italic">"{sub.feedback}"</p>
-                                    </div>
+                                    {sub.feedback && (
+                                        <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg">
+                                            <p className="text-xs font-bold text-slate-500 uppercase mb-1">Feedback</p>
+                                            <p className="text-sm text-slate-700 dark:text-slate-300 italic">"{sub.feedback}"</p>
+                                        </div>
+                                    )}
                                 </div>
                             )) : (
                                 <div className="text-center py-10">
@@ -689,9 +854,122 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
                             )}
                         </div>
                     )}
+
+                    {courseTab === 'resources' && (
+                        <div className="space-y-4">
+                             {resources.length > 0 ? resources.map(res => (
+                                <div key={res.id} className="bg-white dark:bg-slate-700 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-600 flex items-start">
+                                    <div className={`p-3 rounded-lg mr-4 ${
+                                        res.type === 'video' ? 'bg-red-100 text-red-600' : 
+                                        res.type === 'event' ? 'bg-purple-100 text-purple-600' : 
+                                        res.type === 'project' ? 'bg-orange-100 text-orange-600' :
+                                        'bg-blue-100 text-blue-600'
+                                    }`}>
+                                        {res.type === 'video' && <Video className="w-6 h-6" />}
+                                        {res.type === 'event' && <Bell className="w-6 h-6" />}
+                                        {res.type === 'project' && <Briefcase className="w-6 h-6" />}
+                                        {(res.type === 'note' || res.type === 'assignment') && <FileText className="w-6 h-6" />}
+                                        {res.type === 'image' && <ImageIcon className="w-6 h-6" />}
+                                    </div>
+                                    <div className="flex-1">
+                                        <div className="flex justify-between">
+                                            <h4 className="font-bold text-lg dark:text-white">{res.title}</h4>
+                                            <span className="text-xs text-slate-500">{res.datePosted}</span>
+                                        </div>
+                                        <p className="text-sm text-slate-600 dark:text-slate-300 mb-2">{res.description}</p>
+                                        {res.url && (
+                                            <a 
+                                                href={res.url} 
+                                                target="_blank" 
+                                                rel="noopener noreferrer" 
+                                                className="inline-block px-4 py-2 bg-slate-100 dark:bg-slate-600 text-slate-700 dark:text-slate-200 text-sm font-bold rounded-lg hover:bg-slate-200 dark:hover:bg-slate-500 transition-colors"
+                                            >
+                                                View Material
+                                            </a>
+                                        )}
+                                        <p className="text-xs text-slate-400 mt-2">Posted by {res.postedBy}</p>
+                                    </div>
+                                </div>
+                             )) : (
+                                <div className="text-center py-10">
+                                    <ClipboardList className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                                    <p className="text-slate-500">No class resources posted yet.</p>
+                                </div>
+                             )}
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
+      )}
+
+      {/* Community Chat Modal */}
+      {showCommunityModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+              <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-5xl shadow-2xl overflow-hidden flex h-[80vh] animate-scale-up">
+                  {/* Sidebar */}
+                  <div className="w-72 border-r border-slate-200 dark:border-slate-700 hidden md:flex flex-col">
+                      <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
+                          <h2 className="font-bold text-xl dark:text-white flex items-center"><MessageCircle className="mr-2" /> Chats</h2>
+                      </div>
+                      <div className="p-4 space-y-2 overflow-y-auto bg-white dark:bg-slate-800 flex-1">
+                          <div className="p-3 bg-sits-100 dark:bg-sits-900/30 border border-sits-200 dark:border-sits-700 rounded-lg cursor-pointer">
+                              <h3 className="font-bold text-sits-700 dark:text-sits-300">SITS Community</h3>
+                              <p className="text-xs text-slate-500">General Discussion</p>
+                          </div>
+                          <div className="p-3 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg cursor-pointer opacity-50">
+                              <h3 className="font-bold dark:text-white">CSE-SE 2023</h3>
+                              <p className="text-xs text-slate-500">Locked</p>
+                          </div>
+                          <div className="p-3 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg cursor-pointer opacity-50">
+                              <h3 className="font-bold dark:text-white">Project Group A</h3>
+                              <p className="text-xs text-slate-500">Locked</p>
+                          </div>
+                      </div>
+                  </div>
+
+                  {/* Chat Area */}
+                  <div className="flex-1 flex flex-col bg-slate-50 dark:bg-slate-900/50">
+                      <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex justify-between items-center">
+                          <div className="flex items-center">
+                              <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold mr-3">SC</div>
+                              <div>
+                                  <h3 className="font-bold dark:text-white">SITS Community</h3>
+                                  <p className="text-xs text-green-500 flex items-center"><span className="w-2 h-2 rounded-full bg-green-500 mr-1"></span> Online</p>
+                              </div>
+                          </div>
+                          <button onClick={() => setShowCommunityModal(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full"><X className="w-6 h-6 dark:text-slate-400" /></button>
+                      </div>
+
+                      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                          {groupMessages.map((msg) => {
+                              const isMe = msg.senderRoll === user.rollNo;
+                              return (
+                                  <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                                      {!isMe && <div className="w-8 h-8 rounded-full bg-slate-300 flex items-center justify-center text-xs font-bold mr-2">{msg.senderName.charAt(0)}</div>}
+                                      <div className={`max-w-[70%] p-3 rounded-xl shadow-sm ${isMe ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-white rounded-tl-none'}`}>
+                                          {!isMe && <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">{msg.senderName}</p>}
+                                          <p className="text-sm">{msg.text}</p>
+                                          <p className={`text-[10px] text-right mt-1 ${isMe ? 'text-indigo-200' : 'text-slate-400'}`}>{msg.timestamp}</p>
+                                      </div>
+                                  </div>
+                              );
+                          })}
+                      </div>
+
+                      <form onSubmit={handleGroupChatSubmit} className="p-4 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 flex">
+                          <input 
+                              type="text" 
+                              value={groupInput}
+                              onChange={(e) => setGroupInput(e.target.value)}
+                              className="flex-1 p-3 bg-slate-100 dark:bg-slate-700 rounded-lg outline-none dark:text-white"
+                              placeholder="Type a message..."
+                          />
+                          <button type="submit" className="ml-3 p-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg"><Send className="w-5 h-5" /></button>
+                      </form>
+                  </div>
+              </div>
+          </div>
       )}
 
       {/* Assignment Modal */}
