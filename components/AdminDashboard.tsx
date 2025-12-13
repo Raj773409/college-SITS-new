@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect } from 'react';
 import { UserProfile, AuditLogEntry } from '../types';
 import { 
-  Users, UserPlus, Trash2, LogOut, Shield, Search, School, History, Settings, X, Lock, UserX, Activity, AlertTriangle, Save
+  Users, UserPlus, Trash2, LogOut, Shield, Search, School, History, Settings, X, Lock, UserX, Activity, AlertTriangle, Save, Filter
 } from 'lucide-react';
 
 interface AdminDashboardProps {
@@ -23,6 +22,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
   
   // Search State
   const [searchQuery, setSearchQuery] = useState("");
+  const [auditSearch, setAuditSearch] = useState("");
+  const [auditFilter, setAuditFilter] = useState("all");
 
   // Faculty Form
   const [newFaculty, setNewFaculty] = useState({ name: '', rollNo: '', password: '' });
@@ -169,6 +170,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
     f.rollNo.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const filteredLogs = logs.filter(log => {
+      const matchesSearch = log.details.toLowerCase().includes(auditSearch.toLowerCase()) || 
+                            log.target.toLowerCase().includes(auditSearch.toLowerCase()) ||
+                            log.actor.toLowerCase().includes(auditSearch.toLowerCase());
+      const matchesFilter = auditFilter === 'all' ? true : log.action.includes(auditFilter);
+      return matchesSearch && matchesFilter;
+  });
+
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-100 flex">
       {/* Sidebar */}
@@ -236,7 +245,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
         {activeTab === 'overview' && (
             <div className="animate-fade-in space-y-6">
                 <div className="grid grid-cols-3 gap-6">
-                    <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 hover:-translate-y-1 transition-transform">
+                    <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 hover:-translate-y-1 transition-transform card-hover-effect">
                         <div className="flex justify-between items-start mb-4">
                             <div>
                                 <h3 className="text-slate-500 dark:text-slate-400 font-medium text-sm uppercase tracking-wider">Total Students</h3>
@@ -251,7 +260,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                         </div>
                     </div>
                     
-                    <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 hover:-translate-y-1 transition-transform">
+                    <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 hover:-translate-y-1 transition-transform card-hover-effect">
                         <div className="flex justify-between items-start mb-4">
                             <div>
                                 <h3 className="text-slate-500 dark:text-slate-400 font-medium text-sm uppercase tracking-wider">Active Now</h3>
@@ -266,7 +275,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                         </div>
                     </div>
 
-                    <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 hover:-translate-y-1 transition-transform">
+                    <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 hover:-translate-y-1 transition-transform card-hover-effect">
                         <div className="flex justify-between items-start mb-4">
                             <div>
                                 <h3 className="text-slate-500 dark:text-slate-400 font-medium text-sm uppercase tracking-wider">Faculty Members</h3>
@@ -394,7 +403,36 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
 
         {activeTab === 'audit' && (
             <div className="animate-fade-in">
-                <h1 className="text-3xl font-bold mb-6 dark:text-white">System Audit Logs</h1>
+                <div className="flex justify-between items-center mb-6">
+                    <h1 className="text-3xl font-bold dark:text-white">System Audit Logs</h1>
+                    <div className="flex space-x-2">
+                         <div className="relative">
+                            <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+                            <input 
+                                type="text" 
+                                placeholder="Search logs..." 
+                                className="pl-10 pr-4 py-2 bg-white dark:bg-slate-800 rounded-lg outline-none text-sm w-64 border border-slate-200 dark:border-slate-700 dark:text-white focus:ring-2 focus:ring-indigo-500"
+                                value={auditSearch}
+                                onChange={(e) => setAuditSearch(e.target.value)}
+                            />
+                        </div>
+                        <div className="relative">
+                             <div className="absolute left-3 top-2.5 pointer-events-none text-slate-400">
+                                 <Filter className="w-4 h-4" />
+                             </div>
+                             <select 
+                                value={auditFilter}
+                                onChange={(e) => setAuditFilter(e.target.value)}
+                                className="pl-10 pr-8 py-2 bg-white dark:bg-slate-800 rounded-lg outline-none text-sm border border-slate-200 dark:border-slate-700 dark:text-white focus:ring-2 focus:ring-indigo-500 appearance-none"
+                             >
+                                 <option value="all">All Actions</option>
+                                 <option value="CREATE">Create</option>
+                                 <option value="UPDATE">Update</option>
+                                 <option value="DELETE">Delete</option>
+                             </select>
+                        </div>
+                    </div>
+                </div>
                 <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
                     <table className="w-full text-left">
                         <thead className="bg-slate-100 dark:bg-slate-900 text-slate-500 dark:text-slate-400 text-xs uppercase font-semibold">
@@ -406,7 +444,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                            {logs.map(log => (
+                            {filteredLogs.map(log => (
                                 <tr key={log.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
                                     <td className="p-4 text-xs font-mono text-slate-500 dark:text-slate-400">{log.timestamp}</td>
                                     <td className="p-4">
@@ -424,6 +462,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                             ))}
                         </tbody>
                     </table>
+                    {filteredLogs.length === 0 && (
+                        <div className="text-center p-8 text-slate-500">
+                            No logs found matching your criteria.
+                        </div>
+                    )}
                 </div>
             </div>
         )}

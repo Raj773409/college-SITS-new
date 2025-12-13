@@ -68,15 +68,19 @@ export interface Submission {
 }
 
 // New Types for Faculty Resources
-export type ResourceType = 'note' | 'video' | 'assignment' | 'event' | 'project' | 'image';
+export type ResourceType = 'note' | 'video' | 'assignment' | 'event' | 'project' | 'image' | 'pdf' | 'lab_manual' | 'question_paper' | 'recording';
 
 export interface CourseResource {
   id: string;
   title: string;
   description: string;
   type: ResourceType;
+  subject?: string; // Added subject for categorization
+  targetYear?: string; // Added target year
   url?: string; // Or base64 content
+  fileName?: string; // For uploaded files
   datePosted: string;
+  timePosted?: string; // Added time
   postedBy: string;
 }
 
@@ -88,13 +92,25 @@ export interface AttendanceRecord {
 }
 
 // New Types for Chat
+export interface ChatGroup {
+  id: string;
+  name: string;
+  type?: 'group' | 'dm'; // Distinguish between group and direct message
+  participants?: string[]; // IDs of people in DM
+  description: string;
+  createdBy: string;
+  members: string[]; // array of rollNos
+  createdAt: string;
+}
+
 export interface ChatMessage {
   id: string;
   senderRoll: string;
   senderName: string;
   text: string;
   timestamp: string;
-  groupName: string; // 'General', 'CSE-A', etc.
+  groupId: string; // ID of the group
+  groupName?: string; // Fallback or display name
 }
 
 export enum AppRoute {

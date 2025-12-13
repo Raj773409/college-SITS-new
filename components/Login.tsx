@@ -1,6 +1,8 @@
+
 import React, { useState } from 'react';
 import { UserProfile } from '../types';
-import { Lock, User, ArrowRight, ShieldCheck, BookOpen } from 'lucide-react';
+import { Lock, User, ArrowRight, ShieldCheck } from 'lucide-react';
+import { api } from '../services/api';
 
 interface LoginProps {
   onLoginSuccess: (user: UserProfile, needsOnboarding: boolean) => void;
@@ -12,101 +14,23 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const updateUserStatus = (rollNo: string, isActive: boolean) => {
-    const storedUsers = localStorage.getItem('sits_users');
-    if (storedUsers) {
-      const users = JSON.parse(storedUsers);
-      if (users[rollNo]) {
-        users[rollNo].isActive = isActive;
-        localStorage.setItem('sits_users', JSON.stringify(users));
-      }
-    }
-  };
-
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
 
-    // Simulate network delay
-    setTimeout(() => {
-      // 1. Check for Admin Login
-      if (rollNo === '23TQ1ANANI@21' && password === 'SITSADMIN@212005') {
-        const adminUser: UserProfile = {
-          rollNo: 'ADMIN',
-          name: 'Administrator',
-          language: 'English',
-          year: 'N/A',
-          branch: 'ADMIN',
-          isSetupComplete: true,
-          role: 'admin',
-          isActive: true
-        };
-        onLoginSuccess(adminUser, false);
+    try {
+        const result = await api.login(rollNo, password);
+        if (result.error) {
+            setError(result.error);
+        } else if (result.user) {
+            onLoginSuccess(result.user, !!result.needsOnboarding);
+        }
+    } catch (err) {
+        setError("Network error. Please try again.");
+    } finally {
         setIsLoading(false);
-        return;
-      }
-
-      // 2. Check for Faculty Login
-      const storedFaculty = localStorage.getItem('sits_faculty');
-      const facultyMembers = storedFaculty ? JSON.parse(storedFaculty) : {};
-      
-      if (facultyMembers[rollNo] && facultyMembers[rollNo].password === password) {
-         const facultyUser: UserProfile = {
-             ...facultyMembers[rollNo],
-             role: 'faculty',
-             isActive: true
-         };
-         onLoginSuccess(facultyUser, false);
-         setIsLoading(false);
-         return;
-      }
-
-      // 3. Check for Student Login
-      const storedUsers = localStorage.getItem('sits_users');
-      const users: Record<string, UserProfile> = storedUsers ? JSON.parse(storedUsers) : {};
-      const user = users[rollNo];
-
-      // Logic for First Time User (Student)
-      if (!user) {
-        // Only allow student login if not trying to be admin/faculty
-        if (password === 'SITS') {
-          // New user found, needs setup
-          const tempUser: UserProfile = {
-            rollNo,
-            name: '',
-            language: 'English',
-            year: '1',
-            branch: 'CSE-SE',
-            isSetupComplete: false,
-            role: 'student',
-            isActive: true
-          };
-          onLoginSuccess(tempUser, true);
-        } else {
-          setError('Invalid Credentials. Default password is SITS.');
-        }
-      } 
-      // Logic for Returning Student
-      else {
-        if (password === 'SITS') {
-             // If user exists but tries to use default password (security measure)
-             if (user.isSetupComplete) {
-                setError('Setup already complete. Please use your personal password.');
-             } else {
-                 // Should technically not happen if flow works, but handle resume onboarding
-                 onLoginSuccess(user, true);
-             }
-        } else if (user.password === password) {
-          updateUserStatus(rollNo, true); // Mark as active
-          const activeUser = { ...user, isActive: true, role: 'student' as const };
-          onLoginSuccess(activeUser, false);
-        } else {
-          setError('Invalid Password.');
-        }
-      }
-      setIsLoading(false);
-    }, 800);
+    }
   };
 
   return (
