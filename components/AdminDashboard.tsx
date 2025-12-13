@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { UserProfile, AuditLogEntry } from '../types';
 import { 
-  Users, UserPlus, Trash2, LogOut, Shield, Search, School, History, Settings, X, Lock, UserX, Activity, AlertTriangle, Save, Filter
+  Users, UserPlus, Trash2, LogOut, Shield, Search, School, History, Settings, X, Lock, UserX, Activity, AlertTriangle, Save, Filter, Key, Power, Unlock, Edit2, Check
 } from 'lucide-react';
 
 interface AdminDashboardProps {
@@ -69,6 +69,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
       role: 'faculty',
       branch: 'CSE-SE',
       isSetupComplete: true,
+      isActive: true, // Default to active
       profilePic: ''
     };
 
@@ -132,10 +133,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                   logAction('UPDATE_FACULTY', rollNo, `Updated: ${changes.join(', ')}`);
               }
               
-              // Only close modal if it wasn't a specific field update from the manage modal
-              if(updates.isActive !== undefined || updates.password !== undefined) {
-                   // Keep open or handle specifically
-              } else {
+              // Only close modal if it wasn't a specific field update from the manage modal actions
+              if(updates.name || updates.branch) {
                   setShowManageFacultyModal(null);
               }
           }
@@ -156,6 +155,23 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
   const openManageModal = (f: UserProfile) => {
       setEditFacultyForm({ name: f.name, branch: f.branch });
       setShowManageFacultyModal(f);
+  };
+  
+  const handleResetPassword = (rollNo: string) => {
+      const newPass = prompt("Enter new password for this faculty member:");
+      if(newPass && newPass.length >= 4) {
+          updateFaculty(rollNo, { password: newPass });
+          alert("Password updated successfully.");
+      } else if (newPass) {
+          alert("Password must be at least 4 characters.");
+      }
+  };
+
+  const toggleFacultyStatus = (f: UserProfile) => {
+      const action = f.isActive ? "deactivate" : "activate";
+      if(confirm(`Are you sure you want to ${action} ${f.name}?`)) {
+          updateFaculty(f.rollNo, { isActive: !f.isActive });
+      }
   };
 
   const activeStudentsCount = students.filter(s => s.isActive).length;
@@ -311,7 +327,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                             />
                         </div>
                     </div>
-                    <table className="w-full text-left">
+                    <table className="w-full text-left border-collapse">
                         <thead className="bg-slate-100 dark:bg-slate-900 text-slate-500 dark:text-slate-400 text-xs uppercase font-semibold">
                             <tr>
                                 <th className="p-4">Roll No</th>
@@ -322,8 +338,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                            {filteredStudents.map(student => (
-                                <tr key={student.rollNo} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                            {filteredStudents.map((student, idx) => (
+                                <tr key={student.rollNo} className={`hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${idx % 2 === 0 ? 'bg-white dark:bg-slate-800' : 'bg-slate-50/50 dark:bg-slate-800/50'}`}>
                                     <td className="p-4 font-mono text-sm dark:text-slate-300">{student.rollNo}</td>
                                     <td className="p-4 flex items-center dark:text-white">
                                         <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center text-indigo-700 dark:text-indigo-300 font-bold mr-3 overflow-hidden">
@@ -370,27 +386,53 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                 </div>
                 
                 <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
-                     <table className="w-full text-left">
+                     <table className="w-full text-left border-collapse">
                         <thead className="bg-slate-100 dark:bg-slate-900 text-slate-500 dark:text-slate-400 text-xs uppercase font-semibold">
                             <tr>
                                 <th className="p-4">ID / Roll No</th>
                                 <th className="p-4">Name</th>
                                 <th className="p-4">Branch</th>
-                                <th className="p-4">Action</th>
+                                <th className="p-4">Status</th>
+                                <th className="p-4">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                            {filteredFaculty.map(f => (
-                                <tr key={f.rollNo} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                            {filteredFaculty.map((f, idx) => (
+                                <tr key={f.rollNo} className={`hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${idx % 2 === 0 ? 'bg-white dark:bg-slate-800' : 'bg-slate-50/50 dark:bg-slate-800/50'}`}>
                                     <td className="p-4 font-mono dark:text-slate-300">{f.rollNo}</td>
-                                    <td className="p-4 font-bold dark:text-white">{f.name}</td>
+                                    <td className="p-4 font-bold dark:text-white flex items-center">
+                                        <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 font-bold mr-3 text-xs">
+                                            {f.name.charAt(0)}
+                                        </div>
+                                        {f.name}
+                                    </td>
                                     <td className="p-4 dark:text-slate-300">{f.branch}</td>
                                     <td className="p-4">
+                                         <span className={`px-2 py-1 rounded-full text-xs font-bold border ${f.isActive !== false ? 'bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-900/20 dark:border-emerald-900 dark:text-emerald-400' : 'bg-red-50 border-red-200 text-red-600 dark:bg-red-900/20 dark:border-red-900 dark:text-red-400'}`}>
+                                            {f.isActive !== false ? 'Active' : 'Deactivated'}
+                                        </span>
+                                    </td>
+                                    <td className="p-4 flex items-center space-x-2">
                                         <button 
                                             onClick={() => openManageModal(f)}
-                                            className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 font-medium text-sm flex items-center px-3 py-1 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded transition-colors"
+                                            title="Edit Details"
+                                            className="p-2 text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-900/30 rounded-lg transition-colors"
                                         >
-                                            <Settings className="w-4 h-4 mr-1" /> Edit
+                                            <Edit2 className="w-4 h-4" />
+                                        </button>
+                                        <button 
+                                            onClick={() => handleResetPassword(f.rollNo)}
+                                            title="Reset Password"
+                                            className="p-2 text-amber-600 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-900/30 rounded-lg transition-colors"
+                                        >
+                                            <Key className="w-4 h-4" />
+                                        </button>
+                                        <button 
+                                            onClick={() => toggleFacultyStatus(f)}
+                                            title={f.isActive !== false ? "Deactivate Account" : "Activate Account"}
+                                            className={`p-2 rounded-lg transition-colors ${f.isActive !== false ? 'text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30' : 'text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/30'}`}
+                                        >
+                                            {f.isActive !== false ? <Power className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
                                         </button>
                                     </td>
                                 </tr>
@@ -434,7 +476,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                     </div>
                 </div>
                 <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
-                    <table className="w-full text-left">
+                    <table className="w-full text-left border-collapse">
                         <thead className="bg-slate-100 dark:bg-slate-900 text-slate-500 dark:text-slate-400 text-xs uppercase font-semibold">
                             <tr>
                                 <th className="p-4">Timestamp</th>
@@ -444,8 +486,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                            {filteredLogs.map(log => (
-                                <tr key={log.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                            {filteredLogs.map((log, idx) => (
+                                <tr key={log.id} className={`hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${idx % 2 === 0 ? 'bg-white dark:bg-slate-800' : 'bg-slate-50/50 dark:bg-slate-800/50'}`}>
                                     <td className="p-4 text-xs font-mono text-slate-500 dark:text-slate-400">{log.timestamp}</td>
                                     <td className="p-4">
                                         <span className={`px-2 py-1 rounded font-bold text-xs border ${
@@ -548,31 +590,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                     </form>
 
                     <div className="border-t border-slate-100 dark:border-slate-700 pt-4 space-y-3">
-                        <button 
-                            onClick={() => {
-                                const newPass = prompt("Enter new password:");
-                                if(newPass) updateFaculty(showManageFacultyModal.rollNo, { password: newPass });
-                            }}
-                            className="w-full flex items-center justify-center p-3 bg-slate-50 dark:bg-slate-700 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-600 text-sm font-medium dark:text-slate-200"
-                        >
-                            <Lock className="w-4 h-4 mr-2" /> Reset Password
-                        </button>
-                        
-                         <div className="grid grid-cols-2 gap-3">
-                            <button 
-                                onClick={() => {
-                                    if(confirm("Are you sure you want to deactivate this account? User won't be able to login.")) 
-                                        updateFaculty(showManageFacultyModal.rollNo, { isActive: false });
-                                }}
-                                className="flex items-center justify-center p-3 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400 rounded-lg hover:bg-yellow-100 dark:hover:bg-yellow-900/40 text-sm font-medium"
-                            >
-                                <UserX className="w-4 h-4 mr-2" /> Deactivate
-                            </button>
+                         <div className="grid grid-cols-1 gap-3">
                              <button 
                                 onClick={() => deleteFaculty(showManageFacultyModal.rollNo)}
                                 className="flex items-center justify-center p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40 text-sm font-medium"
                             >
-                                <Trash2 className="w-4 h-4 mr-2" /> Delete
+                                <Trash2 className="w-4 h-4 mr-2" /> Delete Account
                             </button>
                          </div>
                     </div>
