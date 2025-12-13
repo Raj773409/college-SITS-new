@@ -113,6 +113,16 @@ export interface ChatMessage {
   groupName?: string; // Fallback or display name
 }
 
+// Activity Feed Type
+export interface ActivityFeedItem {
+  id: string;
+  type: 'submission' | 'enrollment' | 'roadmap' | 'attendance' | 'login' | 'resource';
+  title: string;
+  description: string;
+  timestamp: string;
+  meta?: string;
+}
+
 export enum AppRoute {
   LOGIN = 'login',
   ONBOARDING = 'onboarding',

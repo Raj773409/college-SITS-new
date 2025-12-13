@@ -64,8 +64,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
     const storedFaculty = localStorage.getItem('sits_faculty');
     const currentFaculty = storedFaculty ? JSON.parse(storedFaculty) : {};
     
-    currentFaculty[newFaculty.rollNo] = {
+    // Force uppercase for consistency with Login component
+    const upperRollNo = newFaculty.rollNo.toUpperCase();
+
+    currentFaculty[upperRollNo] = {
       ...newFaculty,
+      rollNo: upperRollNo,
       role: 'faculty',
       branch: 'CSE-SE',
       isSetupComplete: true,
@@ -74,7 +78,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
     };
 
     localStorage.setItem('sits_faculty', JSON.stringify(currentFaculty));
-    logAction('CREATE_FACULTY', newFaculty.rollNo, `Created faculty account for ${newFaculty.name}`);
+    logAction('CREATE_FACULTY', upperRollNo, `Created faculty account for ${newFaculty.name}`);
     
     setFaculty(Object.values(currentFaculty));
     setNewFaculty({ name: '', rollNo: '', password: '' });
@@ -244,8 +248,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
 
       {/* Main Content */}
       <div className="flex-1 ml-64 overflow-y-auto">
-        
-        {/* Hero Section for Overview */}
+        {/* ... (Overview, Students, Audit sections remain same) ... */}
         {activeTab === 'overview' && (
             <div className="bg-slate-800 text-white p-8 pb-16 relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/20 rounded-full -translate-y-10 translate-x-10 blur-3xl"></div>
@@ -311,7 +314,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
 
         {activeTab === 'students' && (
             <div className="animate-fade-in">
-                <div className="flex justify-between items-end mb-6">
+                 {/* Student Tab Content */}
+                 <div className="flex justify-between items-end mb-6">
                     <h1 className="text-3xl font-bold dark:text-white">Student Management</h1>
                 </div>
                 <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
@@ -445,6 +449,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
 
         {activeTab === 'audit' && (
             <div className="animate-fade-in">
+                {/* Audit Content */}
                 <div className="flex justify-between items-center mb-6">
                     <h1 className="text-3xl font-bold dark:text-white">System Audit Logs</h1>
                     <div className="flex space-x-2">
@@ -530,11 +535,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                         />
                         <input 
                             type="text" 
-                            placeholder="Roll No / ID" 
+                            placeholder="Roll No / ID (Auto Uppercase)" 
                             required 
-                            className="w-full p-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                            className="w-full p-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none uppercase"
                             value={newFaculty.rollNo}
-                            onChange={e => setNewFaculty({...newFaculty, rollNo: e.target.value})}
+                            onChange={e => setNewFaculty({...newFaculty, rollNo: e.target.value.toUpperCase()})}
                         />
                         <input 
                             type="password" 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { UserProfile, Submission, SkillRoadmap, ResumeData, ChatMessage, ChatGroup, CourseResource, AttendanceRecord, ResourceType } from '../types';
+import { UserProfile, Submission, SkillRoadmap, ResumeData, ChatMessage, ChatGroup, CourseResource, AttendanceRecord, ResourceType, ActivityFeedItem } from '../types';
 import { 
   Bell, Search, Menu, BookOpen, Calendar, Award, Settings, X, Send,
   Sparkles, Sun, Moon, Upload, ClipboardList, Plus, FileText, Trash2,
@@ -7,7 +7,7 @@ import {
   CheckSquare, RefreshCw, Printer, HelpCircle, ChevronRight, User as UserIcon, Camera,
   GraduationCap, Clock, MessageCircle, Bot, Video, Image as ImageIcon, Users,
   TrendingUp, Activity, Star, Library, FileQuestion, Book, MonitorPlay, FolderOpen,
-  CreditCard, UserPlus, Hash, FileDown, Phone, Video as VideoIcon, MoreVertical, Paperclip
+  CreditCard, UserPlus, Hash, FileDown, Phone, Video as VideoIcon, MoreVertical, Paperclip, MapPin
 } from 'lucide-react';
 import { generateAIResponse, generateJSON } from '../services/geminiService';
 import ProfileSection from './ProfileSection';
@@ -68,6 +68,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpda
   const [resources, setResources] = useState<CourseResource[]>([]);
   const [attendanceStats, setAttendanceStats] = useState<{present: number, absent: number, percentage: number}>({present: 0, absent: 0, percentage: 0});
   const [attendanceHistory, setAttendanceHistory] = useState<AttendanceRecord[]>([]);
+  const [recentActivities, setRecentActivities] = useState<ActivityFeedItem[]>([]);
 
   // Feature Forms
   const [assignmentForm, setAssignmentForm] = useState({ title: '', description: '', dueDate: '', file: null as File | null });
@@ -102,10 +103,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpda
     { subject: 'Artificial Intelligence', faculty: 'Dr. K. Murthy', qualification: 'Ph.D', contact: 'kmurthy@sits.edu' },
     { subject: 'Cloud Computing', faculty: 'Mr. R. Das', qualification: 'M.Tech', contact: 'rdas@sits.edu' },
   ];
-  const classmates = [ { roll: '23TQ1A5602', name: 'Priya Sharma' }, { roll: '23TQ1A5603', name: 'Rahul Verma' }, { roll: '23TQ1A5604', name: 'Amit Patel' }, { roll: '23TQ1A5605', name: 'Sneha Gupta' } ];
-  const libraryBooks = [ { id: 1, title: 'Introduction to Algorithms', author: 'Cormen', status: 'Available', type: 'Physical' }, { id: 2, title: 'Clean Code', author: 'Robert C. Martin', status: 'Borrowed', type: 'Physical' }, { id: 3, title: 'Artificial Intelligence: A Modern Approach', author: 'Russell & Norvig', status: 'Available', type: 'Physical' }, { id: 4, title: 'System Design Interview', author: 'Alex Xu', status: 'Available', type: 'E-Book' }, { id: 5, title: 'You Don\'t Know JS', author: 'Kyle Simpson', status: 'Available', type: 'E-Book' } ];
-  const examSchedule = [ { code: '23CS2101', title: 'Data Structures', date: '2024-05-15', time: '10:00 AM - 01:00 PM', venue: 'Block A - 301' }, { code: '23CS2102', title: 'Operating Systems', date: '2024-05-17', time: '10:00 AM - 01:00 PM', venue: 'Block A - 304' }, { code: '23CS2103', title: 'Database Management', date: '2024-05-20', time: '10:00 AM - 01:00 PM', venue: 'Block B - 201' } ];
-
+  
   // Initial Data Fetch
   useEffect(() => {
     const fetchData = async () => {
@@ -116,6 +114,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpda
         setAttendanceStats(data.attendanceStats);
         setAttendanceHistory(data.attendanceHistory);
         setGradedSubmissions(data.submissions);
+        setRecentActivities(data.recentActivities);
         
         // Mock Chat Data (Local for now as it's complex to mock nicely in simple API)
         const storedGroups = localStorage.getItem('sits_chat_groups');
@@ -150,8 +149,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpda
 
   const toggleTheme = () => setIsDark(!isDark);
 
-  // --- Handlers (Keep existing logic mostly, but route updates via API if fully implementing) ---
-  // For brevity, keeping local state logic for modal interactions, but simulating "Backend" readiness
+  // --- Handlers ---
   
   const handleAiSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -164,9 +162,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpda
     setChatMessages(prev => [...prev, { role: 'ai', text: response }]);
     setIsAiLoading(false);
   };
-
-  // ... (Other handlers: handleGroupChatSubmit, createGroup, startDM, enrollInCourse, etc. remain same as previous context but should ideally move to API) ...
-  // Re-implementing core handlers for functionality:
 
   const handleGroupChatSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -236,6 +231,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpda
     }
     setIsGeneratingRoadmap(false);
   };
+  
+  const handleUpdateResume = async (e: React.FormEvent) => {
+      e.preventDefault();
+      const updatedUser = { ...user, resume: resumeForm };
+      await api.updateUser(updatedUser);
+      onUserUpdate(updatedUser);
+      alert("Resume updated!");
+      setShowResumeModal(false);
+  };
 
   const getFilteredResources = () => {
       let filtered = resources;
@@ -243,12 +247,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpda
       if (subjectFilter !== 'all') filtered = filtered.filter(r => r.subject === subjectFilter);
       if (postSearchQuery.trim()) filtered = filtered.filter(r => r.title.toLowerCase().includes(postSearchQuery.toLowerCase()));
       return filtered;
-  };
-
-  const getDaysInMonth = () => {
-    const today = new Date();
-    const days = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
-    return Array.from({length: days}, (_, i) => new Date(today.getFullYear(), today.getMonth(), i + 1));
   };
 
   const FeatureCard = ({ icon: Icon, title, desc, color, onClick }: any) => (
@@ -342,6 +340,44 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpda
                     <FeatureCard icon={ClipboardList} title="Assignments" desc="Submit Work" color="bg-orange-500" onClick={() => setShowAssignmentsModal(true)} />
                     <FeatureCard icon={Calendar} title="Attendance" desc={`${attendanceStats.percentage}% Present`} color="bg-emerald-500" onClick={() => setShowAttendanceModal(true)} />
                     <FeatureCard icon={Award} title="Results" desc="CGPA: 8.5" color="bg-amber-500" onClick={() => setShowResultsModal(true)} />
+                </div>
+            )}
+            
+            {/* Student Activity Feed */}
+            {!isLoading && recentActivities.length > 0 && (
+                <div className="mb-10">
+                    <h2 className="text-2xl font-bold text-slate-800 dark:text-white mb-6 flex items-center"><Activity className="w-6 h-6 mr-2 text-indigo-500" /> Recent Activity</h2>
+                    <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700 p-6">
+                        <div className="space-y-6">
+                            {recentActivities.map((activity) => (
+                                <div key={activity.id} className="flex items-start space-x-4 border-b border-slate-50 dark:border-slate-700 last:border-0 pb-4 last:pb-0">
+                                    <div className={`p-3 rounded-full flex-shrink-0 ${
+                                        activity.type === 'submission' ? 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400' :
+                                        activity.type === 'enrollment' ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' :
+                                        activity.type === 'attendance' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400' :
+                                        'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'
+                                    }`}>
+                                        {activity.type === 'submission' && <ClipboardList className="w-5 h-5" />}
+                                        {activity.type === 'enrollment' && <BookOpen className="w-5 h-5" />}
+                                        {activity.type === 'attendance' && <CheckCircle className="w-5 h-5" />}
+                                        {activity.type === 'resource' && <Download className="w-5 h-5" />}
+                                    </div>
+                                    <div className="flex-1">
+                                        <div className="flex justify-between items-center mb-1">
+                                            <h4 className="font-bold text-slate-800 dark:text-white">{activity.title}</h4>
+                                            <span className="text-xs text-slate-400">{activity.timestamp}</span>
+                                        </div>
+                                        <p className="text-sm text-slate-500 dark:text-slate-400">{activity.description}</p>
+                                        {activity.meta && (
+                                            <span className="inline-block mt-2 px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-slate-100 dark:bg-slate-700 text-slate-500">
+                                                {activity.meta}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -497,11 +533,251 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpda
         </div>
       )}
 
-      {/* Other Modals (Courses, Assignments, Results, etc.) simplified for brevity but functional */}
+      {/* Courses Modal */}
       {showCoursesModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in"><div className="bg-white dark:bg-slate-800 rounded-3xl w-full max-w-5xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"><div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900"><h2 className="text-2xl font-bold dark:text-white flex items-center"><BookOpen className="mr-3 text-blue-500" /> Academic Courses</h2><button onClick={() => setShowCoursesModal(false)}><X className="w-6 h-6 dark:text-slate-400" /></button></div><div className="p-6 flex-1 overflow-y-auto"><div className="grid grid-cols-1 md:grid-cols-2 gap-4">{courseCatalog.map(c => (<div key={c.id} className="bg-slate-50 dark:bg-slate-700 p-4 rounded-xl border border-slate-200 dark:border-slate-600"><h3 className="font-bold dark:text-white">{c.title}</h3><p className="text-sm text-slate-500 dark:text-slate-300">{c.instructor}</p><button onClick={() => enrollInCourse(c.id)} className="mt-2 text-sm text-blue-600 font-bold hover:underline">Enroll</button></div>))}</div></div></div></div>
       )}
-      {/* ... Add remaining modals (Assignments, Attendance, Results, Library, Exam, Resume, Skill) similar to above ... */}
+
+      {/* Assignments Modal */}
+      {showAssignmentsModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
+              <div className="bg-white dark:bg-slate-800 rounded-3xl w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                  <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900">
+                      <h2 className="text-2xl font-bold dark:text-white flex items-center"><ClipboardList className="mr-3 text-orange-500" /> Assignments</h2>
+                      <button onClick={() => setShowAssignmentsModal(false)}><X className="w-6 h-6 dark:text-slate-400" /></button>
+                  </div>
+                  <div className="p-6 flex-1 overflow-y-auto">
+                      <div className="space-y-4">
+                        {/* Mock Pending Assignment */}
+                        <div className="border border-slate-200 dark:border-slate-700 rounded-xl p-4 bg-white dark:bg-slate-700/50">
+                             <div className="flex justify-between items-start mb-2">
+                                 <div>
+                                    <h3 className="font-bold dark:text-white">Data Structures Lab 4</h3>
+                                    <p className="text-sm text-slate-500">Implement Linked List</p>
+                                 </div>
+                                 <span className="text-xs font-bold bg-amber-100 text-amber-700 px-2 py-1 rounded">Pending</span>
+                             </div>
+                             <button onClick={() => {setShowAssignmentsModal(false); setShowConfirmationModal(true);}} className="mt-2 w-full bg-indigo-600 text-white py-2 rounded-lg font-bold hover:bg-indigo-700 text-sm">Submit Work</button>
+                        </div>
+                         {gradedSubmissions.map(sub => (
+                             <div key={sub.id} className="border border-slate-200 dark:border-slate-700 rounded-xl p-4 bg-white dark:bg-slate-700/50 opacity-80">
+                                 <div className="flex justify-between items-start">
+                                     <div>
+                                        <h3 className="font-bold dark:text-white">{sub.assignmentTitle}</h3>
+                                        <p className="text-sm text-slate-500">Submitted on {sub.submittedDate}</p>
+                                     </div>
+                                     <span className="text-xs font-bold bg-emerald-100 text-emerald-700 px-2 py-1 rounded">{sub.status}</span>
+                                 </div>
+                             </div>
+                         ))}
+                      </div>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* Attendance Modal */}
+      {showAttendanceModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
+              <div className="bg-white dark:bg-slate-800 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                  <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900">
+                      <h2 className="text-2xl font-bold dark:text-white flex items-center"><Calendar className="mr-3 text-emerald-500" /> Attendance History</h2>
+                      <button onClick={() => setShowAttendanceModal(false)}><X className="w-6 h-6 dark:text-slate-400" /></button>
+                  </div>
+                  <div className="p-6 flex-1 overflow-y-auto">
+                      <div className="mb-4 text-center p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl border border-emerald-100 dark:border-emerald-900">
+                          <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{attendanceStats.percentage}%</p>
+                          <p className="text-xs font-bold uppercase text-emerald-600/70">Overall Attendance</p>
+                      </div>
+                      <div className="space-y-2">
+                          {attendanceHistory.map((rec, idx) => (
+                              <div key={idx} className="flex justify-between items-center p-3 border-b border-slate-100 dark:border-slate-700">
+                                  <span className="font-mono text-sm dark:text-slate-300">{rec.date}</span>
+                                  <span className={`text-xs font-bold uppercase px-2 py-1 rounded ${
+                                      rec.status === 'present' ? 'bg-emerald-100 text-emerald-700' : 
+                                      rec.status === 'absent' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
+                                  }`}>{rec.status}</span>
+                              </div>
+                          ))}
+                      </div>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* Results Modal */}
+      {showResultsModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
+               <div className="bg-white dark:bg-slate-800 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden">
+                    <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900">
+                        <h2 className="text-2xl font-bold dark:text-white flex items-center"><Award className="mr-3 text-amber-500" /> Results</h2>
+                        <button onClick={() => setShowResultsModal(false)}><X className="w-6 h-6 dark:text-slate-400" /></button>
+                    </div>
+                    <div className="p-6">
+                        <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-xl text-center mb-6 border border-amber-100 dark:border-amber-900">
+                            <h3 className="text-4xl font-bold text-amber-600 dark:text-amber-400">8.5</h3>
+                            <p className="text-xs uppercase font-bold text-amber-600/70">Current CGPA</p>
+                        </div>
+                        <table className="w-full text-left">
+                            <thead>
+                                <tr className="text-xs font-bold text-slate-400 uppercase border-b dark:border-slate-700"><th className="pb-2">Subject</th><th className="pb-2">Grade</th><th className="pb-2">Credits</th></tr>
+                            </thead>
+                            <tbody className="text-sm dark:text-slate-300">
+                                <tr className="border-b dark:border-slate-800"><td className="py-2">Data Structures</td><td className="py-2 font-bold text-emerald-500">A+</td><td className="py-2">4</td></tr>
+                                <tr className="border-b dark:border-slate-800"><td className="py-2">Java Programming</td><td className="py-2 font-bold text-emerald-500">A</td><td className="py-2">3</td></tr>
+                                <tr className="border-b dark:border-slate-800"><td className="py-2">Digital Logic</td><td className="py-2 font-bold text-blue-500">B+</td><td className="py-2">3</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+               </div>
+          </div>
+      )}
+
+      {/* Library Modal */}
+      {showLibraryModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
+              <div className="bg-white dark:bg-slate-800 rounded-3xl w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                  <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900">
+                      <h2 className="text-2xl font-bold dark:text-white flex items-center"><Library className="mr-3 text-pink-500" /> Digital Library</h2>
+                      <button onClick={() => setShowLibraryModal(false)}><X className="w-6 h-6 dark:text-slate-400" /></button>
+                  </div>
+                  <div className="p-6 grid grid-cols-2 md:grid-cols-4 gap-4 overflow-y-auto">
+                      {[1, 2, 3, 4, 5, 6].map(i => (
+                          <div key={i} className="bg-slate-50 dark:bg-slate-700 p-4 rounded-xl border border-slate-200 dark:border-slate-600 flex flex-col items-center text-center">
+                              <div className={`w-20 h-28 rounded-md mb-3 shadow-md ${i % 2 === 0 ? 'bg-blue-200' : 'bg-rose-200'}`}></div>
+                              <h3 className="font-bold text-sm dark:text-white line-clamp-2">Computer Science Vol {i}</h3>
+                              <button className="mt-2 text-xs bg-indigo-600 text-white px-3 py-1 rounded-full font-bold hover:bg-indigo-700">Borrow</button>
+                          </div>
+                      ))}
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* Exam Modal */}
+      {showExamModal && (
+           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
+               <div className="bg-white dark:bg-slate-800 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden">
+                   <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900">
+                        <h2 className="text-2xl font-bold dark:text-white flex items-center"><FileQuestion className="mr-3 text-cyan-500" /> Exam Cell</h2>
+                        <button onClick={() => setShowExamModal(false)}><X className="w-6 h-6 dark:text-slate-400" /></button>
+                   </div>
+                   <div className="p-6">
+                       <h3 className="font-bold mb-4 dark:text-white">Upcoming Exams</h3>
+                       <div className="space-y-3">
+                           <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-700 rounded-lg border border-slate-100 dark:border-slate-600">
+                               <div><p className="font-bold text-sm dark:text-white">Data Structures Mid-1</p><p className="text-xs text-slate-500">Room 304</p></div>
+                               <div className="text-right"><p className="font-bold text-sm text-indigo-600 dark:text-indigo-400">Oct 24</p><p className="text-xs text-slate-500">10:00 AM</p></div>
+                           </div>
+                           <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-700 rounded-lg border border-slate-100 dark:border-slate-600">
+                               <div><p className="font-bold text-sm dark:text-white">OS Mid-1</p><p className="text-xs text-slate-500">Room 201</p></div>
+                               <div className="text-right"><p className="font-bold text-sm text-indigo-600 dark:text-indigo-400">Oct 25</p><p className="text-xs text-slate-500">02:00 PM</p></div>
+                           </div>
+                       </div>
+                   </div>
+               </div>
+           </div>
+      )}
+
+      {/* Resume Modal */}
+      {showResumeModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
+              <div className="bg-white dark:bg-slate-800 rounded-3xl w-full max-w-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                   <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900">
+                        <h2 className="text-2xl font-bold dark:text-white flex items-center"><Briefcase className="mr-3 text-slate-600 dark:text-slate-300" /> Resume Builder</h2>
+                        <button onClick={() => setShowResumeModal(false)}><X className="w-6 h-6 dark:text-slate-400" /></button>
+                   </div>
+                   <div className="p-6 overflow-y-auto flex-1">
+                       <form onSubmit={handleUpdateResume} className="space-y-4">
+                           <div><label className="text-xs font-bold text-slate-500 dark:text-slate-400">Professional Summary</label><textarea className="w-full p-3 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white" rows={3} value={resumeForm.summary} onChange={e => setResumeForm({...resumeForm, summary: e.target.value})}></textarea></div>
+                           <div><label className="text-xs font-bold text-slate-500 dark:text-slate-400">Technical Skills</label><input type="text" className="w-full p-3 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white" value={resumeForm.skills} onChange={e => setResumeForm({...resumeForm, skills: e.target.value})} /></div>
+                           <div><label className="text-xs font-bold text-slate-500 dark:text-slate-400">Projects</label><textarea className="w-full p-3 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white" rows={3} value={resumeForm.projects} onChange={e => setResumeForm({...resumeForm, projects: e.target.value})}></textarea></div>
+                           <button type="submit" className="w-full bg-slate-800 dark:bg-slate-700 text-white py-3 rounded-lg font-bold">Save Resume</button>
+                       </form>
+                   </div>
+              </div>
+          </div>
+      )}
+
+      {/* Skill Modal */}
+      {showSkillModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
+              <div className="bg-white dark:bg-slate-800 rounded-3xl w-full max-w-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                  <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900">
+                        <h2 className="text-2xl font-bold dark:text-white flex items-center"><Target className="mr-3 text-purple-600" /> AI Skill Roadmap</h2>
+                        <button onClick={() => setShowSkillModal(false)}><X className="w-6 h-6 dark:text-slate-400" /></button>
+                  </div>
+                  <div className="p-6 flex-1 overflow-y-auto">
+                      {!roadmap ? (
+                          <div className="text-center py-10">
+                              <Target className="w-16 h-16 mx-auto text-slate-300 mb-4" />
+                              <h3 className="text-lg font-bold dark:text-white mb-4">Generate a Learning Path</h3>
+                              <input type="text" placeholder="Enter skill (e.g. React, Python)" className="w-full max-w-md p-3 border rounded-lg mb-4 dark:bg-slate-700 dark:border-slate-600 dark:text-white" value={skillInterest} onChange={e => setSkillInterest(e.target.value)} />
+                              <button onClick={generateRoadmap} disabled={isGeneratingRoadmap} className="bg-purple-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-purple-700 disabled:opacity-50">{isGeneratingRoadmap ? 'Generating...' : 'Create Roadmap'}</button>
+                          </div>
+                      ) : (
+                          <div>
+                              <div className="flex justify-between items-center mb-6">
+                                  <h3 className="text-xl font-bold dark:text-white capitalize">{roadmap.interest} Roadmap</h3>
+                                  <button onClick={() => setRoadmap(undefined)} className="text-sm text-red-500 font-bold hover:underline">Reset</button>
+                              </div>
+                              <div className="space-y-4">
+                                  {roadmap.days.map(day => (
+                                      <div key={day.day} className="flex p-4 border rounded-xl dark:border-slate-700">
+                                          <div className="w-12 h-12 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-600 flex items-center justify-center font-bold mr-4 shrink-0">{day.day}</div>
+                                          <div>
+                                              <h4 className="font-bold dark:text-white">{day.topic}</h4>
+                                              <p className="text-sm text-slate-500 dark:text-slate-400">{day.task}</p>
+                                          </div>
+                                      </div>
+                                  ))}
+                              </div>
+                          </div>
+                      )}
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* Subject Faculty Modal */}
+      {showFacultyModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
+              <div className="bg-white dark:bg-slate-800 rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                  <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900">
+                        <h2 className="text-2xl font-bold dark:text-white flex items-center"><Users className="mr-3 text-teal-500" /> Subject Faculties</h2>
+                        <button onClick={() => setShowFacultyModal(false)}><X className="w-6 h-6 dark:text-slate-400" /></button>
+                  </div>
+                  <div className="p-6 grid grid-cols-1 gap-4 overflow-y-auto">
+                      {subjectFaculties.map((fac, idx) => (
+                          <div key={idx} className="flex items-center p-4 border rounded-xl dark:border-slate-700 bg-white dark:bg-slate-700/50">
+                              <div className="w-12 h-12 rounded-full bg-teal-100 dark:bg-teal-900/30 text-teal-600 flex items-center justify-center font-bold mr-4">{fac.faculty.charAt(0)}</div>
+                              <div className="flex-1">
+                                  <h4 className="font-bold dark:text-white">{fac.faculty}</h4>
+                                  <p className="text-xs font-bold uppercase text-teal-500">{fac.subject}</p>
+                                  <p className="text-xs text-slate-500 dark:text-slate-400">{fac.qualification}</p>
+                              </div>
+                              <button className="text-sm font-bold text-indigo-600 dark:text-indigo-400 hover:underline">Contact</button>
+                          </div>
+                      ))}
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* Confirmation Modal */}
+      {showConfirmationModal && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
+              <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 w-full max-w-sm shadow-xl text-center">
+                  <CheckCircle className="w-16 h-16 text-emerald-500 mx-auto mb-4" />
+                  <h3 className="text-xl font-bold dark:text-white mb-2">Confirm Submission?</h3>
+                  <p className="text-slate-500 dark:text-slate-400 mb-6">Are you sure you want to submit this assignment?</p>
+                  <div className="flex space-x-3">
+                      <button onClick={confirmSubmission} className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white py-2 rounded-lg font-bold transition-colors">Yes, Submit</button>
+                      <button onClick={() => setShowConfirmationModal(false)} className="flex-1 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-white py-2 rounded-lg font-bold transition-colors">Cancel</button>
+                  </div>
+              </div>
+          </div>
+      )}
       
     </div>
   );

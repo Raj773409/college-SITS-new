@@ -1,5 +1,5 @@
 
-import { UserProfile, CourseResource, AttendanceRecord, Submission } from '../types';
+import { UserProfile, CourseResource, AttendanceRecord, Submission, ActivityFeedItem } from '../types';
 
 // SIMULATED BACKEND (Node.js/MongoDB replacement)
 // In a real app, these functions would be fetch() calls to your Express/Mongo endpoints.
@@ -20,18 +20,26 @@ export const api = {
   login: async (rollNo: string, password: string): Promise<{ user: UserProfile | null, error?: string, needsOnboarding?: boolean }> => {
     return new Promise((resolve) => {
       setTimeout(() => {
-        // Admin Logic
-        if (rollNo === 'ADMIN' && password === 'ADMIN') { // Simplified for demo
-             // In real backend, validate hash
-             resolve({ user: { rollNo: 'ADMIN', name: 'Administrator', role: 'admin' } as UserProfile });
+        // 1. Admin Logic
+        if (rollNo === 'ADMIN' && password === 'ADMIN') { 
+             resolve({ user: { rollNo: 'ADMIN', name: 'Administrator', role: 'admin', language: 'en', year: 'N/A', branch: 'ADMIN', isSetupComplete: true } as UserProfile });
              return;
         }
 
-        // Student/Faculty Logic
-        const users = getStorage('sits_users') || {};
-        const user = users[rollNo];
+        // 2. Fetch all user databases
+        const students = getStorage('sits_users') || {};
+        const faculty = getStorage('sits_faculty') || {};
+        
+        // 3. Check Student Database
+        let user = students[rollNo];
+
+        // 4. If not found in students, check Faculty Database
+        if (!user) {
+            user = faculty[rollNo];
+        }
 
         if (!user) {
+          // If totally new student trying to register with default pass
           if (password === 'SITS') {
             const newUser: UserProfile = {
               rollNo, name: '', language: 'English', year: '1', branch: 'CSE-SE',
@@ -42,12 +50,21 @@ export const api = {
             resolve({ user: null, error: 'Invalid Credentials' });
           }
         } else {
+          // User exists (Student or Faculty)
           if (password === 'SITS' && !user.isSetupComplete) {
              resolve({ user, needsOnboarding: true });
           } else if (user.password === password) {
              user.isActive = true;
-             users[rollNo] = user;
-             setStorage('sits_users', users);
+             
+             // Update the specific storage bucket
+             if (user.role === 'faculty') {
+                 faculty[rollNo] = user;
+                 setStorage('sits_faculty', faculty);
+             } else {
+                 students[rollNo] = user;
+                 setStorage('sits_users', students);
+             }
+             
              resolve({ user });
           } else {
              resolve({ user: null, error: 'Invalid Password' });
@@ -60,19 +77,26 @@ export const api = {
   updateUser: async (user: UserProfile): Promise<UserProfile> => {
     return new Promise((resolve) => {
       setTimeout(() => {
-        const users = getStorage('sits_users') || {};
+        const storageKey = user.role === 'faculty' ? 'sits_faculty' : 'sits_users';
+        const users = getStorage(storageKey) || {};
         users[user.rollNo] = user;
-        setStorage('sits_users', users);
+        setStorage(storageKey, users);
         resolve(user);
       }, 1000);
     });
   },
 
   logout: async (rollNo: string) => {
-      const users = getStorage('sits_users') || {};
-      if (users[rollNo]) {
-          users[rollNo].isActive = false;
-          setStorage('sits_users', users);
+      // We don't know role here easily without passing it, but strictly checking both isn't harmful for logout status
+      const students = getStorage('sits_users') || {};
+      const faculty = getStorage('sits_faculty') || {};
+      
+      if (students[rollNo]) {
+          students[rollNo].isActive = false;
+          setStorage('sits_users', students);
+      } else if (faculty[rollNo]) {
+          faculty[rollNo].isActive = false;
+          setStorage('sits_faculty', faculty);
       }
   },
 
@@ -89,12 +113,54 @@ export const api = {
         const present = myAttendance.filter((r: AttendanceRecord) => r.status === 'present').length;
         const total = myAttendance.length;
         const percentage = total === 0 ? 100 : Math.round((present / total) * 100);
+        
+        const mySubmissions = submissions.filter((s: Submission) => s.studentRoll === rollNo);
+
+        // Generate Simulated Activity Feed
+        const activities: ActivityFeedItem[] = [];
+        
+        // 1. Recent Submissions
+        mySubmissions.slice(0, 3).forEach((s: Submission) => {
+            activities.push({
+                id: `sub-${s.id}`,
+                type: 'submission',
+                title: 'Assignment Submitted',
+                description: `You submitted "${s.assignmentTitle}"`,
+                timestamp: s.submittedDate, // In real app, calculate relative time
+                meta: s.status
+            });
+        });
+
+        // 2. Attendance alerts (mocked based on stats)
+        if (myAttendance.length > 0) {
+            const lastRecord = myAttendance[myAttendance.length - 1];
+            activities.push({
+                id: `att-${lastRecord.date}`,
+                type: 'attendance',
+                title: 'Attendance Marked',
+                description: `You were marked ${lastRecord.status.toUpperCase()}`,
+                timestamp: lastRecord.date
+            });
+        }
+
+        // 3. Mock Enrollments / Roadmap
+        activities.push({
+            id: 'act-1',
+            type: 'enrollment',
+            title: 'Course Enrolled',
+            description: 'You joined "Data Structures & Algorithms"',
+            timestamp: '2 days ago'
+        });
+
+        // Sort roughly by "recent" (mock sort for mixed types)
+        const sortedActivities = activities.reverse();
 
         resolve({
           resources: resources.reverse(), // Newest first
           attendanceStats: { present, absent: total - present, percentage },
           attendanceHistory: myAttendance,
-          submissions: submissions.filter((s: Submission) => s.studentRoll === rollNo)
+          submissions: mySubmissions,
+          recentActivities: sortedActivities
         });
       }, LATENCY);
     });
@@ -132,7 +198,7 @@ export const api = {
                 resources[index] = updatedResource;
                 setStorage('sits_resources', resources);
             }
-            resolve(resources); // Return updated list or single resource depending on need, simple list for now
+            resolve(resources);
         }, 800);
     });
   }
